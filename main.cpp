@@ -25,7 +25,7 @@ struct Concurrent_Queue
     size_t size;
     pthread_mutex_t mutex;
     pthread_cond_t cond_full;
-    pthread_cond_t cond_empty;
+    pthread_cond_t cond_empty_or_done;
     int is_done;
 
     void done()
@@ -33,7 +33,7 @@ struct Concurrent_Queue
         ec(pthread_mutex_lock(&mutex));
         is_done = 1;
         ec(pthread_mutex_unlock(&mutex));
-        pthread_cond_signal(&cond_empty);
+        pthread_cond_signal(&cond_empty_or_done);
     }
 
     void push(T element)
@@ -46,7 +46,7 @@ struct Concurrent_Queue
         elements[(begin + size) % Capacity] = element;
         size += 1;
         ec(pthread_mutex_unlock(&mutex));
-        ec(pthread_cond_signal(&cond_empty));
+        ec(pthread_cond_signal(&cond_empty_or_done));
     }
 
     int pop(T *element)
@@ -55,10 +55,10 @@ struct Concurrent_Queue
         while (size == 0) {
             if (is_done) {
                 ec(pthread_mutex_unlock(&mutex));
-                ec(pthread_cond_signal(&cond_empty));
+                ec(pthread_cond_signal(&cond_empty_or_done));
                 return 0;
             }
-            ec(pthread_cond_wait(&cond_empty, &mutex));
+            ec(pthread_cond_wait(&cond_empty_or_done, &mutex));
         }
 
         if (element) *element = elements[begin];
